@@ -147,6 +147,10 @@ async function startCamera(facing) {
   const actual = stream.getVideoTracks()[0]?.getSettings?.().facingMode;
   state.facing = actual || facing;
 
+  // Must stay in lockstep with the `mirrored` flag handed to makeMapper below,
+  // otherwise the skeleton is drawn flipped relative to the picture.
+  applyMirror();
+
   resizeCanvas();
 }
 
@@ -156,6 +160,15 @@ function stopCamera() {
     state.stream = null;
   }
   el.video.srcObject = null;
+}
+
+/** True when the preview is mirrored, i.e. we are on the selfie camera. */
+function isMirrored() {
+  return state.facing === 'user';
+}
+
+function applyMirror() {
+  el.video.classList.toggle('mirrored', isMirrored());
 }
 
 /* -------------------------------------------------------------- wake lock */
@@ -201,11 +214,12 @@ function loop() {
       const result = state.landmarker.detectForVideo(el.video, ts);
       state.latest = {
         hands: result.landmarks || [],
-        // The <video> always carries raw, unmirrored sensor frames -- the selfie
-        // mirroring happens only in the mapper below, on the way to the canvas.
-        // MediaPipe reports anatomically correct handedness for an unmirrored
-        // view (verified against its own right_hands.jpg fixture), so the label
-        // is already right for both cameras and must not be flipped.
+        // The detector always sees raw, unmirrored sensor frames: the selfie
+        // mirroring is applied downstream, to the preview (CSS) and the overlay
+        // (the mapper), never to the pixels fed in here. MediaPipe reports
+        // anatomically correct handedness for an unmirrored view (verified
+        // against its own right_hands.jpg fixture), so the label is already
+        // right for both cameras and must not be flipped.
         labels: (result.handedness || []).map((h) => h?.[0]?.categoryName || ''),
       };
     } catch (err) {
@@ -223,7 +237,7 @@ function loop() {
     videoH: vh,
     viewW,
     viewH,
-    mirrored: state.facing === 'user',
+    mirrored: isMirrored(),
   });
 
   drawHands(ctx, state.latest.hands, state.latest.labels, mapper, { style: state.style });

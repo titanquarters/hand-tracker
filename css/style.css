@@ -51,6 +51,11 @@ body { user-select: none; -webkit-user-select: none; touch-action: manipulation;
   transition: opacity .25s ease;
 }
 
+/* The selfie camera hands us raw, unmirrored frames, but people expect a
+   mirror when looking at themselves. The overlay mapper mirrors to match, so
+   these two must be toggled together or the skeleton lands flipped. */
+#video.mirrored { transform: scaleX(-1); }
+
 /* "skeleton only" mode dims the camera feed right down */
 body.video-dim #video { opacity: 0.12; }
 

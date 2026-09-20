@@ -72,11 +72,16 @@ await context.addInitScript(({ b64, W, H }) => {
     requestAnimationFrame(paint);
   })();
 
-  const stream = canvas.captureStream(30);
-  const track = stream.getVideoTracks()[0];
-  track.getSettings = () => ({ width: W, height: H, facingMode: 'user', frameRate: 30 });
-
-  navigator.mediaDevices.getUserMedia = async () => stream;
+  navigator.mediaDevices.getUserMedia = async (constraints) => {
+    // A fresh stream per call, like the real thing: switching cameras stops the
+    // tracks of the old one, so handing back the same stream twice yields a
+    // dead track and no frames.
+    const stream = canvas.captureStream(30);
+    const req = constraints?.video?.facingMode;
+    const facing = (typeof req === 'string' ? req : req?.ideal || req?.exact) || 'user';
+    stream.getVideoTracks()[0].getSettings = () => ({ width: W, height: H, facingMode: facing, frameRate: 30 });
+    return stream;
+  };
   navigator.mediaDevices.enumerateDevices = async () => ([
     { kind: 'videoinput', deviceId: 'fake-front', label: 'Fake Front', groupId: 'g' },
     { kind: 'videoinput', deviceId: 'fake-back', label: 'Fake Back', groupId: 'g' },
@@ -182,13 +187,15 @@ await page.waitForTimeout(600);
 
 // Camera flip.
 await page.click('#btnFlip');
-await page.waitForTimeout(1200);
+await page.waitForTimeout(2500);
 const flipped = await page.evaluate(() => ({
   facing: window.__handApp.state.facing,
   running: window.__handApp.state.running,
   hands: window.__handApp.state.latest.hands.length,
 }));
 check(flipped.running, 'still running after camera flip', JSON.stringify(flipped));
+check(flipped.facing === 'environment', 'flip switched to the rear camera', flipped.facing);
+check(flipped.hands === EXPECT_HANDS, 'tracking resumes after camera flip', `${flipped.hands} hands`);
 
 check(errors.length === 0, 'no console or page errors', errors.slice(0, 4).join(' | '));
 
