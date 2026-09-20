@@ -29,8 +29,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # enablement: true turns Pages on via the API and points it at Actions,
-      # so the site does not need to be switched on by hand first.
+      # Keeps the Pages source pointed at Actions. Note this cannot bootstrap a
+      # repository where Pages has never been switched on: the github-pages
+      # environment gate is evaluated before any step runs, so the job is
+      # rejected before this step could enable anything. Pages has to be turned
+      # on once under Settings -> Pages -> Source: GitHub Actions.
       - uses: actions/configure-pages@v5
         with:
           enablement: true
