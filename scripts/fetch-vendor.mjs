@@ -14,6 +14,8 @@ const VERSION = '1.0.1';
 const OUT = new URL('../vendor/', import.meta.url).pathname;
 const MODEL_URL =
   'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task';
+const POSE_MODEL_URL =
+  'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task';
 
 mkdirSync(OUT + 'wasm', { recursive: true });
 
@@ -37,11 +39,14 @@ console.log('  saved   vision_bundle.mjs + wasm/');
 console.log('Fetching the hand-landmark model...');
 await download(MODEL_URL, OUT + 'hand_landmarker.task');
 
+console.log('Fetching the pose-landmark model (Skeleton Mirror)...');
+await download(POSE_MODEL_URL, OUT + 'pose_landmarker_lite.task');
+
 // Photographs of real hands, used as the fake camera feed in the test suite.
 // Downloaded rather than committed so we are not redistributing them.
 console.log('Fetching test fixtures...');
 mkdirSync(OUT + 'fixtures', { recursive: true });
-for (const name of ['right_hands.jpg', 'pointing_up.jpg']) {
+for (const name of ['right_hands.jpg', 'pointing_up.jpg', 'pose.jpg']) {
   await download(`https://storage.googleapis.com/mediapipe-assets/${name}`, `${OUT}fixtures/${name}`);
 }
 

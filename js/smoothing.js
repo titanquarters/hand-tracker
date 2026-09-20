@@ -69,24 +69,34 @@ class OneEuro {
   }
 }
 
-const LANDMARK_COUNT = 21;
 const AXES = ['x', 'y', 'z'];
 
-/** One filter per axis per landmark, for a single tracked hand. */
-class HandFilters {
+/**
+ * One filter per axis per landmark, for a single tracked body.
+ *
+ * The bank sizes itself on first use, so the same class serves hands (21
+ * landmarks) and full-body poses (33).
+ */
+class LandmarkFilters {
   constructor(minCutoff, beta) {
+    this.minCutoff = minCutoff;
+    this.beta = beta;
     this.filters = [];
-    for (let i = 0; i < LANDMARK_COUNT; i++) {
-      this.filters.push({
-        x: new OneEuro(minCutoff, beta),
-        y: new OneEuro(minCutoff, beta),
-        z: new OneEuro(minCutoff, beta),
-      });
-    }
     this.lastSeen = 0;
   }
 
+  grow(count) {
+    while (this.filters.length < count) {
+      this.filters.push({
+        x: new OneEuro(this.minCutoff, this.beta),
+        y: new OneEuro(this.minCutoff, this.beta),
+        z: new OneEuro(this.minCutoff, this.beta),
+      });
+    }
+  }
+
   apply(landmarks, dt) {
+    this.grow(landmarks.length);
     return landmarks.map((point, i) => {
       const f = this.filters[i];
       const out = { ...point };
@@ -102,6 +112,8 @@ class HandFilters {
   }
 
   retune(minCutoff, beta) {
+    this.minCutoff = minCutoff;
+    this.beta = beta;
     for (const f of this.filters) for (const axis of AXES) f[axis].retune(minCutoff, beta);
   }
 }
@@ -125,11 +137,12 @@ function tuningFor(strength) {
 }
 
 /**
- * Smooths whole detection results, keeping a separate filter bank per hand.
+ * Smooths whole detection results, keeping a separate filter bank per subject.
  *
- * Banks are keyed on handedness rather than array position, because MediaPipe
- * may reorder the hands between frames and a positional key would then swap
- * two hands' histories -- which looks far worse than no smoothing at all.
+ * Banks are keyed on a caller-supplied label rather than array position,
+ * because MediaPipe may reorder its results between frames and a positional
+ * key would then swap two subjects' histories -- which looks far worse than no
+ * smoothing at all. Hands pass their handedness; poses pass a tracking id.
  */
 export class HandSmoother {
   constructor(strength = 0.5) {
@@ -156,8 +169,8 @@ export class HandSmoother {
     let bank = this.banks.get(key);
     if (!bank) {
       bank = {
-        screen: new HandFilters(this.minCutoff, this.beta),
-        world: new HandFilters(this.minCutoff, this.beta),
+        screen: new LandmarkFilters(this.minCutoff, this.beta),
+        world: new LandmarkFilters(this.minCutoff, this.beta),
         lastSeen: now,
       };
       this.banks.set(key, bank);
@@ -172,7 +185,7 @@ export class HandSmoother {
   /**
    * @param hands  landmark arrays, normalised to the frame
    * @param world  metric landmark arrays, or an empty array
-   * @param labels "Left"/"Right" per hand, used as the filter-bank key
+   * @param labels one key per subject, used to pick its filter bank
    * @param now    timestamp in ms
    */
   apply(hands, world, labels, now) {

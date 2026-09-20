@@ -10,3 +10,6 @@ node_modules
 
 # Screenshots written by the test suite
 /.screenshots/
+
+# Scratch scripts used while iterating
+*.tmp.mjs

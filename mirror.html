@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Skeleton Mirror</title>
+<meta name="description" content="Step in front of the camera and watch your body fall away." />
+<meta name="theme-color" content="#04060a" />
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+<link rel="stylesheet" href="css/mirror.css" />
+</head>
+<body>
+
+<div id="frame">
+  <video id="video" playsinline autoplay muted></video>
+  <canvas id="stage"></canvas>
+</div>
+
+<!-- Offscreen scratch buffer for the body-erase mask -->
+<canvas id="maskbuf" width="1" height="1" hidden></canvas>
+
+<div id="hud" class="hidden"><span id="stat">0 bodies</span></div>
+
+<div id="idle" class="hidden">
+  <p>Step into the light</p>
+</div>
+
+<div id="splash">
+  <div class="card">
+    <h1>Skeleton<span>Mirror</span></h1>
+    <p id="splashMsg">Stand still, and see what you are underneath.</p>
+    <button id="btnStart" class="primary">Begin</button>
+    <p class="fine">Nothing is recorded. Everything happens on this machine.</p>
+  </div>
+</div>
+
+<script src="lib/matter.min.js"></script>
+<script type="module" src="js/mirror/app.js"></script>
+</body>
+</html>
