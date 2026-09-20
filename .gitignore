@@ -1,0 +1,10 @@
+# Local copies of the MediaPipe wasm runtime and model, pulled down only so the
+# test suite can run the pipeline offline. ~42 MB, fetched from the CDN at runtime.
+/vendor/
+
+node_modules/
+.DS_Store
+*.log
+
+# Screenshots written by the test suite
+/.screenshots/

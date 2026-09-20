@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#101a36"/>
+      <stop offset="1" stop-color="#05070d"/>
+    </linearGradient>
+    <linearGradient id="bone" gradientUnits="userSpaceOnUse" x1="110" y1="150" x2="345" y2="410">
+      <stop offset="0" stop-color="#22d3ee"/>
+      <stop offset="1" stop-color="#a78bfa"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="9" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="512" height="512" rx="114" fill="url(#bg)"/>
+
+  <g filter="url(#glow)">
+    <g fill="none" stroke="url(#bone)" stroke-width="17" stroke-linecap="round" stroke-linejoin="round">
+      <!-- four fingers -->
+      <path d="M170 318V196"/>
+      <path d="M223 318V158"/>
+      <path d="M276 318V166"/>
+      <path d="M329 318V208"/>
+      <!-- thumb -->
+      <path d="M170 300 118 352"/>
+      <!-- knuckle arch + palm -->
+      <path d="M170 318h159"/>
+      <path d="M170 318c0 52 36 88 80 88s79-36 79-88"/>
+    </g>
+
+    <g fill="#e0f7ff">
+      <circle cx="170" cy="196" r="20"/>
+      <circle cx="223" cy="158" r="20"/>
+      <circle cx="276" cy="166" r="20"/>
+      <circle cx="329" cy="208" r="20"/>
+      <circle cx="118" cy="352" r="20"/>
+      <circle cx="250" cy="406" r="16"/>
+    </g>
+  </g>
+</svg>

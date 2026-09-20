@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
+<title>Hand Skeleton</title>
+<meta name="description" content="Live hand-skeleton tracking using your phone camera." />
+
+<!-- iOS home-screen / standalone behaviour -->
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Hand Skeleton" />
+<meta name="theme-color" content="#05070d" />
+
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+<link rel="apple-touch-icon" href="icons/icon-180.png" />
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<div id="stage">
+  <!-- muted + playsinline are both required for autoplay on iOS Safari -->
+  <video id="video" playsinline autoplay muted></video>
+  <canvas id="overlay"></canvas>
+</div>
+
+<!-- Heads-up display -->
+<div id="hud" class="hidden">
+  <div class="hud-pill" id="statHands"><span class="dot"></span><span id="handsText">0 hands</span></div>
+  <div class="hud-pill" id="statFps">-- fps</div>
+</div>
+
+<!-- Bottom controls -->
+<div id="controls" class="hidden">
+  <button id="btnFlip" class="ctl" aria-label="Switch camera" title="Switch camera">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z"/><path d="M3.8 7.5A2 2 0 0 1 5.8 6h1.6l.9-1.6A2 2 0 0 1 10 3.4h4a2 2 0 0 1 1.7 1L16.6 6h1.6a2 2 0 0 1 2 2v9.6a2 2 0 0 1-2 2H5.8a2 2 0 0 1-2-2V7.5Z" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="m8.6 12.8 1.5 1.5m9.3-6.1-2.4 2.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+  </button>
+  <button id="btnStyle" class="ctl" aria-label="Change skeleton style" title="Change skeleton style">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="7" cy="7" r="2.4" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="17" cy="7" r="2.4" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="17" r="2.4" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8.8 8.6 11 14.9m4.2-6.3L13 14.9M9.4 7h5.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+  </button>
+  <button id="btnVideo" class="ctl" aria-label="Toggle camera view" title="Toggle camera view">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.6 12S6 5.8 12 5.8 21.4 12 21.4 12 18 18.2 12 18.2 2.6 12 2.6 12Z" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="12" r="2.8" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>
+  </button>
+</div>
+
+<!-- Start / status screen -->
+<div id="splash">
+  <div class="splash-card">
+    <div class="splash-icon" aria-hidden="true">
+      <svg viewBox="0 0 64 64">
+        <g fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 44V26m8 18V20m8 24V22m8 22V28"/>
+          <path d="M20 44c0 7 5 12 12 12s12-5 12-12"/>
+          <path d="M20 34 14 40"/>
+        </g>
+        <g fill="currentColor">
+          <circle cx="20" cy="26" r="3"/><circle cx="28" cy="20" r="3"/>
+          <circle cx="36" cy="22" r="3"/><circle cx="44" cy="28" r="3"/>
+          <circle cx="14" cy="40" r="3"/>
+        </g>
+      </svg>
+    </div>
+    <h1>Hand Skeleton</h1>
+    <p id="splashMsg">Point your camera at a hand and a 21&#8209;point skeleton is drawn on top of it, live.</p>
+    <button id="btnStart" class="primary">Start camera</button>
+    <p class="fineprint" id="splashFine">Video never leaves your device &mdash; all tracking runs locally in your browser.</p>
+  </div>
+</div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
