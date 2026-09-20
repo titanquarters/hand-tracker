@@ -117,7 +117,7 @@ body.video-dim #video { opacity: 0.12; }
   bottom: calc(var(--safe-b) + 22px);
   display: flex;
   justify-content: center;
-  gap: 16px;
+  gap: 14px;
   transition: opacity .3s ease;
 }
 
@@ -140,6 +140,13 @@ body.video-dim #video { opacity: 0.12; }
 .ctl svg { width: 25px; height: 25px; display: block; }
 .ctl:active { transform: scale(.9); background: rgba(34, 211, 238, .22); }
 .ctl.off { color: var(--muted); }
+
+/* An engaged mode, e.g. air drawing, reads as filled rather than outlined. */
+.ctl.on {
+  color: #04121c;
+  background: linear-gradient(100deg, var(--accent), var(--accent-2));
+  border-color: transparent;
+}
 
 /* ---------- splash ---------- */
 
@@ -232,6 +239,259 @@ body.video-dim #video { opacity: 0.12; }
 
 .hidden { opacity: 0; pointer-events: none; }
 #splash.gone { display: none; }
+
+/* ---------- 3D hand panel ---------- */
+
+#panel3d {
+  position: fixed;
+  right: calc(var(--safe-r) + 12px);
+  top: calc(var(--safe-t) + 64px);
+  width: 132px;
+  height: 132px;
+  border-radius: 20px;
+  background: var(--pill);
+  border: 1px solid var(--pill-line);
+  backdrop-filter: blur(14px) saturate(1.4);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  overflow: hidden;
+  touch-action: none;
+  transition: opacity .3s ease;
+}
+
+#hand3d { width: 100%; height: 100%; display: block; }
+
+.panel-tag {
+  position: absolute;
+  left: 10px;
+  bottom: 7px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+/* ---------- drawing palette ---------- */
+
+#drawbar {
+  position: fixed;
+  left: calc(var(--safe-l) + 12px);
+  right: calc(var(--safe-r) + 12px);
+  bottom: calc(var(--safe-b) + 92px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  transition: opacity .3s ease;
+}
+
+.swatches {
+  display: flex;
+  gap: 7px;
+  padding: 7px 9px;
+  border-radius: 999px;
+  background: var(--pill);
+  border: 1px solid var(--pill-line);
+  backdrop-filter: blur(14px) saturate(1.4);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+}
+
+.swatch {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  padding: 0;
+  cursor: pointer;
+  transition: transform .12s ease, border-color .15s ease;
+}
+
+.swatch[aria-pressed="true"] {
+  border-color: #fff;
+  transform: scale(1.14);
+}
+
+.mini {
+  padding: 9px 15px;
+  border-radius: 999px;
+  border: 1px solid var(--pill-line);
+  background: var(--pill);
+  backdrop-filter: blur(14px) saturate(1.4);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  color: var(--fg);
+  font: 600 13px/1 inherit;
+  cursor: pointer;
+}
+
+.mini:active { transform: scale(.94); }
+.mini:disabled { opacity: .4; }
+
+/* ---------- settings sheet ---------- */
+
+#scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 8;
+  background: rgba(3, 6, 14, .55);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  transition: opacity .28s ease;
+}
+
+#settings {
+  position: fixed;
+  z-index: 9;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 10px 20px calc(var(--safe-b) + 20px);
+  border-radius: 26px 26px 0 0;
+  background: rgba(11, 17, 32, .93);
+  border-top: 1px solid var(--pill-line);
+  backdrop-filter: blur(22px) saturate(1.4);
+  -webkit-backdrop-filter: blur(22px) saturate(1.4);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 84vh;
+  overflow-y: auto;
+  transition: transform .3s cubic-bezier(.22,.9,.3,1), opacity .25s ease;
+}
+
+#settings.hidden { transform: translateY(100%); }
+
+.sheet-grip {
+  width: 38px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--pill-line);
+  margin: 2px auto 12px;
+  flex: none;
+}
+
+#settings .row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 11px 0;
+  min-height: 44px;
+}
+
+#settings .row.sub { padding-top: 0; }
+#settings .row.sub label { color: var(--muted); font-size: 14px; }
+
+#settings .row.stack {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+
+#settings label {
+  font-size: 15.5px;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.hint {
+  margin: -4px 0 8px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+/* iOS-style switch built from a checkbox, so it stays keyboard accessible. */
+.switch {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: none;
+  width: 50px;
+  height: 30px;
+  border-radius: 999px;
+  background: #2a3550;
+  position: relative;
+  cursor: pointer;
+  transition: background .2s ease;
+  margin: 0;
+}
+
+.switch::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform .2s cubic-bezier(.3,1.4,.5,1);
+}
+
+.switch:checked { background: var(--accent); }
+.switch:checked::after { transform: translateX(20px); }
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: 1;
+  max-width: 190px;
+  height: 4px;
+  border-radius: 2px;
+  background: #2a3550;
+  outline: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+}
+
+.segmented {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 13px;
+  background: #151d33;
+}
+
+.segmented button {
+  flex: 1;
+  padding: 10px 6px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted);
+  font: 600 13.5px/1 inherit;
+  cursor: pointer;
+  text-transform: capitalize;
+  transition: background .18s ease, color .18s ease;
+}
+
+.segmented button[aria-pressed="true"] {
+  background: var(--accent);
+  color: #04121c;
+}
+
+.primary.wide { width: 100%; margin-top: 14px; }
+
+:where(button, input, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
 
 @media (prefers-reduced-motion: reduce) {
   * { transition-duration: .01ms !important; animation-duration: .01ms !important; }

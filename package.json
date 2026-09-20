@@ -7,7 +7,7 @@
   "scripts": {
     "start": "http-server -p 8080 -c-1 .",
     "setup:test": "node scripts/fetch-vendor.mjs",
-    "test": "node test/e2e.mjs && node test/mirror.mjs"
+    "test": "node test/e2e.mjs && node test/mirror.mjs && node test/features.mjs"
   },
   "devDependencies": {
     "http-server": "^14.1.1",

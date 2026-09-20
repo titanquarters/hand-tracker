@@ -1,4 +1,7 @@
 import { drawHands, makeMapper, STYLES } from './skeleton.js';
+import { HandSmoother } from './smoothing.js';
+import { AirCanvas, PALETTE } from './drawing.js';
+import { Hand3DView } from './hand3d.js';
 
 /* ------------------------------------------------------------------ config */
 
@@ -28,6 +31,8 @@ const MAX_HANDS = 2;
 // indistinguishable for soft glowing strokes and leaves fill-rate headroom.
 const MAX_DPR = 2;
 
+const SETTINGS_KEY = 'hand-skeleton.settings';
+
 /* ------------------------------------------------------------------- state */
 
 const el = {
@@ -38,16 +43,36 @@ const el = {
   splashFine: document.getElementById('splashFine'),
   btnStart: document.getElementById('btnStart'),
   btnFlip: document.getElementById('btnFlip'),
-  btnStyle: document.getElementById('btnStyle'),
+  btnDraw: document.getElementById('btnDraw'),
   btnVideo: document.getElementById('btnVideo'),
+  btnSettings: document.getElementById('btnSettings'),
   hud: document.getElementById('hud'),
   controls: document.getElementById('controls'),
   statHands: document.getElementById('statHands'),
   handsText: document.getElementById('handsText'),
   statFps: document.getElementById('statFps'),
+  panel3d: document.getElementById('panel3d'),
+  hand3d: document.getElementById('hand3d'),
+  drawbar: document.getElementById('drawbar'),
+  swatches: document.getElementById('swatches'),
+  btnUndo: document.getElementById('btnUndo'),
+  btnClear: document.getElementById('btnClear'),
+  settings: document.getElementById('settings'),
+  scrim: document.getElementById('scrim'),
+  optSmoothing: document.getElementById('optSmoothing'),
+  optSmoothAmount: document.getElementById('optSmoothAmount'),
+  opt3d: document.getElementById('opt3d'),
+  optLabels: document.getElementById('optLabels'),
+  styleGroup: document.getElementById('styleGroup'),
+  btnCloseSettings: document.getElementById('btnCloseSettings'),
+  rowSmoothAmount: document.getElementById('rowSmoothAmount'),
 };
 
 const ctx = el.canvas.getContext('2d');
+
+const smoother = new HandSmoother(0.5);
+const air = new AirCanvas();
+const view3d = new Hand3DView(el.hand3d);
 
 const state = {
   landmarker: null,
@@ -59,9 +84,47 @@ const state = {
   rafId: 0,
   lastVideoTime: -1,
   lastTimestamp: -1,
-  latest: { hands: [], labels: [] },
+  latest: { hands: [], world: [], labels: [], raw: [] },
   wakeLock: null,
+
+  // User settings, persisted.
+  smoothing: true,
+  smoothAmount: 0.5,
+  show3d: false,
+  showLabels: true,
+  drawing: false,
 };
+
+/* ---------------------------------------------------------------- settings */
+
+function loadSettings() {
+  let saved = null;
+  try {
+    saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null');
+  } catch { /* private mode, or blocked site data */ }
+
+  if (saved && typeof saved === 'object') {
+    if (typeof saved.smoothing === 'boolean') state.smoothing = saved.smoothing;
+    if (typeof saved.smoothAmount === 'number') state.smoothAmount = saved.smoothAmount;
+    if (typeof saved.show3d === 'boolean') state.show3d = saved.show3d;
+    if (typeof saved.showLabels === 'boolean') state.showLabels = saved.showLabels;
+    if (STYLES.includes(saved.style)) state.style = saved.style;
+    if (PALETTE.includes(saved.color)) air.setColor(saved.color);
+  }
+}
+
+function saveSettings() {
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({
+      smoothing: state.smoothing,
+      smoothAmount: state.smoothAmount,
+      show3d: state.show3d,
+      showLabels: state.showLabels,
+      style: state.style,
+      color: air.color,
+    }));
+  } catch { /* nothing we can do, and nothing that matters */ }
+}
 
 /* ------------------------------------------------------------------ canvas */
 
@@ -125,7 +188,7 @@ async function startCamera(facing) {
     stream = await navigator.mediaDevices.getUserMedia(constraints);
   } catch (err) {
     // A device with only one camera rejects an exact/ideal facingMode on some
-    // browsers — retry with the plainest possible request before giving up.
+    // browsers -- retry with the plainest possible request before giving up.
     if (err && (err.name === 'OverconstrainedError' || err.name === 'NotFoundError')) {
       stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: true });
     } else {
@@ -150,6 +213,9 @@ async function startCamera(facing) {
   // Must stay in lockstep with the `mirrored` flag handed to makeMapper below,
   // otherwise the skeleton is drawn flipped relative to the picture.
   applyMirror();
+
+  // Filter history belongs to the old camera's geometry.
+  smoother.reset();
 
   resizeCanvas();
 }
@@ -178,7 +244,7 @@ async function acquireWakeLock() {
     if ('wakeLock' in navigator) {
       state.wakeLock = await navigator.wakeLock.request('screen');
     }
-  } catch { /* not critical — the screen may just dim */ }
+  } catch { /* not critical -- the screen may just dim */ }
 }
 
 function releaseWakeLock() {
@@ -212,16 +278,21 @@ function loop() {
 
     try {
       const result = state.landmarker.detectForVideo(el.video, ts);
-      state.latest = {
-        hands: result.landmarks || [],
-        // The detector always sees raw, unmirrored sensor frames: the selfie
-        // mirroring is applied downstream, to the preview (CSS) and the overlay
-        // (the mapper), never to the pixels fed in here. MediaPipe reports
-        // anatomically correct handedness for an unmirrored view (verified
-        // against its own right_hands.jpg fixture), so the label is already
-        // right for both cameras and must not be flipped.
-        labels: (result.handedness || []).map((h) => h?.[0]?.categoryName || ''),
-      };
+      const raw = result.landmarks || [];
+      const world = result.worldLandmarks || [];
+      // The detector always sees raw, unmirrored sensor frames: the selfie
+      // mirroring is applied downstream, to the preview (CSS) and the overlay
+      // (the mapper), never to the pixels fed in here. MediaPipe reports
+      // anatomically correct handedness for an unmirrored view (verified
+      // against its own right_hands.jpg fixture), so the label is already
+      // right for both cameras and must not be flipped.
+      const labels = (result.handedness || []).map((h) => h?.[0]?.categoryName || '');
+
+      const smoothed = state.smoothing
+        ? smoother.apply(raw, world, labels, now)
+        : { hands: raw, world };
+
+      state.latest = { hands: smoothed.hands, world: smoothed.world, labels, raw };
     } catch (err) {
       console.error('detection failed', err);
     }
@@ -240,7 +311,17 @@ function loop() {
     mirrored: isMirrored(),
   });
 
-  drawHands(ctx, state.latest.hands, state.latest.labels, mapper, { style: state.style });
+  const cursors = air.update(state.latest.hands, state.latest.labels, mapper, state.drawing);
+
+  // Ink sits under the skeleton, so the hand always reads on top of its trail.
+  air.render(ctx, mapper);
+  drawHands(ctx, state.latest.hands, state.latest.labels, mapper, {
+    style: state.style,
+    showLabels: state.showLabels,
+  });
+  if (state.drawing) air.renderCursors(ctx, cursors);
+
+  if (state.show3d) view3d.render(state.latest.world, isMirrored(), now);
 
   // HUD, refreshed about twice a second.
   frames++;
@@ -253,6 +334,8 @@ function loop() {
     const n = state.latest.hands.length;
     el.handsText.textContent = n === 1 ? '1 hand' : `${n} hands`;
     el.statHands.classList.toggle('live', n > 0);
+    el.btnUndo.disabled = air.isEmpty;
+    el.btnClear.disabled = air.isEmpty;
   }
 }
 
@@ -282,15 +365,88 @@ async function flipCamera() {
   }
 }
 
-function cycleStyle() {
-  const i = STYLES.indexOf(state.style);
-  state.style = STYLES[(i + 1) % STYLES.length];
-}
-
 function toggleVideo() {
   state.showVideo = !state.showVideo;
   document.body.classList.toggle('video-dim', !state.showVideo);
   el.btnVideo.classList.toggle('off', !state.showVideo);
+}
+
+/** Show or hide an element that is both `hidden` and opacity-animated. */
+function reveal(node, on) {
+  if (on) {
+    node.hidden = false;
+    // Let the browser lay it out before starting the fade.
+    requestAnimationFrame(() => node.classList.remove('hidden'));
+  } else {
+    node.classList.add('hidden');
+    setTimeout(() => { if (node.classList.contains('hidden')) node.hidden = true; }, 320);
+  }
+}
+
+function setDrawing(on) {
+  state.drawing = on;
+  el.btnDraw.classList.toggle('on', on);
+  el.btnDraw.setAttribute('aria-pressed', String(on));
+  reveal(el.drawbar, on);
+}
+
+function setShow3d(on) {
+  state.show3d = on;
+  reveal(el.panel3d, on);
+  // Keep the switch honest even when this is called from somewhere other than
+  // the switch's own change handler.
+  syncSettingsUI();
+  saveSettings();
+}
+
+function openSettings(on) {
+  reveal(el.scrim, on);
+  reveal(el.settings, on);
+}
+
+/* ------------------------------------------------------------- settings UI */
+
+function buildSwatches() {
+  for (const color of PALETTE) {
+    const b = document.createElement('button');
+    b.className = 'swatch';
+    b.style.background = color;
+    b.setAttribute('aria-label', `Pen colour ${color}`);
+    b.setAttribute('aria-pressed', String(color === air.color));
+    b.addEventListener('click', () => {
+      air.setColor(color);
+      for (const other of el.swatches.children) {
+        other.setAttribute('aria-pressed', String(other === b));
+      }
+      saveSettings();
+    });
+    el.swatches.appendChild(b);
+  }
+}
+
+function buildStyleGroup() {
+  for (const style of STYLES) {
+    const b = document.createElement('button');
+    b.textContent = style;
+    b.setAttribute('aria-pressed', String(style === state.style));
+    b.addEventListener('click', () => {
+      state.style = style;
+      for (const other of el.styleGroup.children) {
+        other.setAttribute('aria-pressed', String(other === b));
+      }
+      saveSettings();
+    });
+    el.styleGroup.appendChild(b);
+  }
+}
+
+function syncSettingsUI() {
+  el.optSmoothing.checked = state.smoothing;
+  el.optSmoothAmount.value = String(state.smoothAmount);
+  el.optSmoothAmount.disabled = !state.smoothing;
+  el.rowSmoothAmount.style.opacity = state.smoothing ? '1' : '.45';
+  el.opt3d.checked = state.show3d;
+  el.optLabels.checked = state.showLabels;
 }
 
 /* ---------------------------------------------------------------- startup */
@@ -341,6 +497,7 @@ async function start() {
   setTimeout(() => el.splash.classList.add('gone'), 400);
   el.hud.classList.remove('hidden');
   el.controls.classList.remove('hidden');
+  if (state.show3d) reveal(el.panel3d, true);
 
   acquireWakeLock();
   startLoop();
@@ -350,8 +507,49 @@ async function start() {
 
 el.btnStart.addEventListener('click', start);
 el.btnFlip.addEventListener('click', flipCamera);
-el.btnStyle.addEventListener('click', cycleStyle);
 el.btnVideo.addEventListener('click', toggleVideo);
+el.btnDraw.addEventListener('click', () => setDrawing(!state.drawing));
+el.btnSettings.addEventListener('click', () => openSettings(true));
+el.btnCloseSettings.addEventListener('click', () => openSettings(false));
+el.scrim.addEventListener('click', () => openSettings(false));
+
+el.btnUndo.addEventListener('click', () => air.undo());
+el.btnClear.addEventListener('click', () => air.clear());
+
+el.optSmoothing.addEventListener('change', () => {
+  state.smoothing = el.optSmoothing.checked;
+  smoother.reset();
+  syncSettingsUI();
+  saveSettings();
+});
+
+el.optSmoothAmount.addEventListener('input', () => {
+  state.smoothAmount = Number(el.optSmoothAmount.value);
+  smoother.setStrength(state.smoothAmount);
+  saveSettings();
+});
+
+el.opt3d.addEventListener('change', () => setShow3d(el.opt3d.checked));
+
+el.optLabels.addEventListener('change', () => {
+  state.showLabels = el.optLabels.checked;
+  saveSettings();
+});
+
+// Drag the 3D panel to turn the hand by hand.
+let dragX = null;
+el.panel3d.addEventListener('pointerdown', (e) => {
+  dragX = e.clientX;
+  el.panel3d.setPointerCapture(e.pointerId);
+});
+el.panel3d.addEventListener('pointermove', (e) => {
+  if (dragX === null) return;
+  view3d.nudge(e.clientX - dragX);
+  dragX = e.clientX;
+});
+for (const type of ['pointerup', 'pointercancel']) {
+  el.panel3d.addEventListener(type, () => { dragX = null; });
+}
 
 window.addEventListener('resize', resizeCanvas);
 window.addEventListener('orientationchange', () => setTimeout(resizeCanvas, 250));
@@ -371,6 +569,7 @@ document.addEventListener('visibilitychange', async () => {
     try { await startCamera(state.facing); } catch (err) { console.error(err); }
   }
   state.lastVideoTime = -1;
+  smoother.reset();
   state.running = true;
   acquireWakeLock();
 });
@@ -401,5 +600,15 @@ if ('serviceWorker' in navigator && location.protocol === 'https:') {
   });
 }
 
-// Test hook: lets test/e2e.mjs inspect detector state and force a draw style.
-window.__handApp = { state, el, resizeCanvas, drawHands, makeMapper };
+loadSettings();
+smoother.setStrength(state.smoothAmount);
+buildSwatches();
+buildStyleGroup();
+syncSettingsUI();
+
+// Test hook: lets the suites inspect detector state and drive the features.
+window.__handApp = {
+  state, el, resizeCanvas, drawHands, makeMapper,
+  smoother, air, view3d, setDrawing, setShow3d,
+  smootherModule: { HandSmoother },
+};

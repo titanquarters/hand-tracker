@@ -26,10 +26,23 @@
   <canvas id="overlay"></canvas>
 </div>
 
+<!-- Rotating 3D model of the hand, from the metric world landmarks -->
+<div id="panel3d" class="hidden" hidden>
+  <canvas id="hand3d"></canvas>
+  <span class="panel-tag">3D</span>
+</div>
+
 <!-- Heads-up display -->
 <div id="hud" class="hidden">
   <div class="hud-pill" id="statHands"><span class="dot"></span><span id="handsText">0 hands</span></div>
   <div class="hud-pill" id="statFps">-- fps</div>
+</div>
+
+<!-- Drawing palette, shown only while air drawing is on -->
+<div id="drawbar" class="hidden" hidden>
+  <div class="swatches" id="swatches"></div>
+  <button id="btnUndo" class="mini" aria-label="Undo last stroke">Undo</button>
+  <button id="btnClear" class="mini" aria-label="Clear drawing">Clear</button>
 </div>
 
 <!-- Bottom controls -->
@@ -37,12 +50,49 @@
   <button id="btnFlip" class="ctl" aria-label="Switch camera" title="Switch camera">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z"/><path d="M3.8 7.5A2 2 0 0 1 5.8 6h1.6l.9-1.6A2 2 0 0 1 10 3.4h4a2 2 0 0 1 1.7 1L16.6 6h1.6a2 2 0 0 1 2 2v9.6a2 2 0 0 1-2 2H5.8a2 2 0 0 1-2-2V7.5Z" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="m8.6 12.8 1.5 1.5m9.3-6.1-2.4 2.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
   </button>
-  <button id="btnStyle" class="ctl" aria-label="Change skeleton style" title="Change skeleton style">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="7" cy="7" r="2.4" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="17" cy="7" r="2.4" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="17" r="2.4" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8.8 8.6 11 14.9m4.2-6.3L13 14.9M9.4 7h5.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+  <button id="btnDraw" class="ctl" aria-label="Air drawing" title="Air drawing" aria-pressed="false">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20.2l.9-3.6L15.4 6.1a1.9 1.9 0 0 1 2.7 0l1.3 1.3a1.9 1.9 0 0 1 0 2.7L8.9 20.6 5.3 21.5a1 1 0 0 1-1.3-1.3Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="m14.2 7.4 3.1 3.1" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>
   </button>
   <button id="btnVideo" class="ctl" aria-label="Toggle camera view" title="Toggle camera view">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.6 12S6 5.8 12 5.8 21.4 12 21.4 12 18 18.2 12 18.2 2.6 12 2.6 12Z" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="12" r="2.8" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>
   </button>
+  <button id="btnSettings" class="ctl" aria-label="Settings" title="Settings">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M19.3 14.5a1.5 1.5 0 0 0 .3 1.7l.1.1a1.8 1.8 0 1 1-2.6 2.6l-.1-.1a1.5 1.5 0 0 0-2.6 1.1v.3a1.8 1.8 0 1 1-3.6 0V20a1.5 1.5 0 0 0-2.6-1l-.1.1a1.8 1.8 0 1 1-2.6-2.6l.1-.1a1.5 1.5 0 0 0-1-2.6H4a1.8 1.8 0 1 1 0-3.6h.2a1.5 1.5 0 0 0 1-2.6l-.1-.1a1.8 1.8 0 1 1 2.6-2.6l.1.1a1.5 1.5 0 0 0 1.7.3H9.6a1.5 1.5 0 0 0 .9-1.4V4a1.8 1.8 0 1 1 3.6 0v.2a1.5 1.5 0 0 0 2.6 1l.1-.1a1.8 1.8 0 1 1 2.6 2.6l-.1.1a1.5 1.5 0 0 0 1 2.6h.3a1.8 1.8 0 1 1 0 3.6H20a1.5 1.5 0 0 0-1.4.9Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+  </button>
+</div>
+
+<!-- Settings sheet -->
+<div id="scrim" class="hidden" hidden></div>
+<div id="settings" class="hidden" hidden role="dialog" aria-modal="true" aria-label="Settings">
+  <div class="sheet-grip" aria-hidden="true"></div>
+
+  <div class="row">
+    <label for="optSmoothing">Smoothing</label>
+    <input type="checkbox" id="optSmoothing" class="switch" checked />
+  </div>
+  <div class="row sub" id="rowSmoothAmount">
+    <label for="optSmoothAmount">Amount</label>
+    <input type="range" id="optSmoothAmount" min="0.05" max="1" step="0.05" value="0.5" />
+  </div>
+  <p class="hint">Steadies the skeleton when your hand is still, without lagging when it moves.</p>
+
+  <div class="row">
+    <label for="opt3d">3D hand view</label>
+    <input type="checkbox" id="opt3d" class="switch" />
+  </div>
+  <p class="hint">A rotating model built from the hand&rsquo;s real 3D shape. Drag it to turn it yourself.</p>
+
+  <div class="row">
+    <label for="optLabels">Left / right labels</label>
+    <input type="checkbox" id="optLabels" class="switch" checked />
+  </div>
+
+  <div class="row stack">
+    <label id="styleLabel">Skeleton style</label>
+    <div class="segmented" role="group" aria-labelledby="styleLabel" id="styleGroup"></div>
+  </div>
+
+  <button id="btnCloseSettings" class="primary wide">Done</button>
 </div>
 
 <!-- Start / status screen -->
