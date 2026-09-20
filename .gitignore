@@ -2,7 +2,9 @@
 # test suite can run the pipeline offline. ~42 MB, fetched from the CDN at runtime.
 /vendor/
 
-node_modules/
+# No trailing slash: a trailing slash matches only real directories, and this
+# is often a symlink to a global install when running the tests locally.
+node_modules
 .DS_Store
 *.log
 
