@@ -34,6 +34,7 @@ const el = {
   idle: document.getElementById('idle'),
   hud: document.getElementById('hud'),
   stat: document.getElementById('stat'),
+  build: document.getElementById('build'),
 };
 
 const ctx = el.canvas.getContext('2d');
@@ -382,6 +383,11 @@ function fail(message) {
   el.btnStart.classList.remove('loading');
   el.btnStart.textContent = 'Try again';
 }
+
+// Shown in the HUD so a stale cached build is obvious at a glance rather than
+// looking like the new one failing to do anything.
+const BUILD = 'anatomical-1';
+if (el.build) el.build.textContent = ` \u00b7 ${BUILD}`;
 
 el.btnStart.addEventListener('click', start);
 window.addEventListener('resize', resize);

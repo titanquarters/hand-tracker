@@ -137,3 +137,5 @@ body.no-video #video { opacity: 0; }
 
 .credit { opacity: .45; }
 .credit a { color: inherit; }
+
+#build { opacity: .5; }

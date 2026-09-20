@@ -1,9 +1,14 @@
 /**
- * Caches the app shell so the page opens instantly on repeat visits and keeps
- * working offline. The MediaPipe wasm + model come from a CDN and are left to
- * the browser's own HTTP cache.
+ * Caches the hand tracker's app shell so it opens instantly and keeps working
+ * offline.
+ *
+ * The Skeleton Mirror is deliberately NOT cached. It is a separate installation
+ * app whose code changes often and whose skeleton model is a 13 MB download,
+ * and a stale copy of it is far worse than a slow one -- a cached build will
+ * happily keep showing an old skeleton long after a new one has shipped, with
+ * nothing on screen to say so.
  */
-const CACHE = 'hand-skeleton-v1';
+const CACHE = 'hand-skeleton-v2';
 
 const SHELL = [
   './',
@@ -11,13 +16,31 @@ const SHELL = [
   './css/style.css',
   './js/app.js',
   './js/skeleton.js',
+  './js/smoothing.js',
+  './js/drawing.js',
+  './js/hand3d.js',
   './manifest.webmanifest',
   './icons/icon.svg',
 ];
 
+/** Paths this worker must never serve from cache. */
+const NEVER_CACHE = [
+  '/mirror.html',
+  '/js/mirror/',
+  '/css/mirror.css',
+  '/lib/',
+  '/art/',
+  '/vendor/',
+];
+
+const bypass = (url) => NEVER_CACHE.some((p) => url.pathname.includes(p));
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())
+    caches.open(CACHE)
+      // One missing file must not fail the whole install.
+      .then((c) => Promise.allSettled(SHELL.map((u) => c.add(u))))
+      .then(() => self.skipWaiting()),
   );
 });
 
@@ -25,16 +48,21 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
       .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
-      .then(() => self.clients.claim())
+      .then(() => self.clients.claim()),
   );
 });
 
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET') return;
-  if (new URL(request.url).origin !== location.origin) return;
 
-  // Network first, falling back to cache, so updates land without a hard reload.
+  const url = new URL(request.url);
+  if (url.origin !== location.origin) return;
+
+  // Let the mirror app go straight to the network, every time.
+  if (bypass(url)) return;
+
+  // Network first, cache as fallback, so an update lands without a hard reload.
   event.respondWith(
     fetch(request)
       .then((response) => {
@@ -42,6 +70,6 @@ self.addEventListener('fetch', (event) => {
         caches.open(CACHE).then((c) => c.put(request, copy)).catch(() => {});
         return response;
       })
-      .catch(() => caches.match(request).then((hit) => hit || caches.match('./index.html')))
+      .catch(() => caches.match(request).then((hit) => hit || caches.match('./index.html'))),
   );
 });
