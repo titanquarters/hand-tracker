@@ -351,7 +351,13 @@ async function start() {
   }
   try {
     el.splashMsg.textContent = 'Waking the dead…';
-    if (!state.model) state.model = await loadModel();
+    // The skeleton is a 13 MB anatomical model; load it alongside the detector
+    // rather than after it, so first paint is never a body with no bones.
+    const [model] = await Promise.all([
+      state.model || loadModel(),
+      skeleton.ready,
+    ]);
+    state.model = model;
     el.splashMsg.textContent = 'Waiting for camera permission…';
     await startCamera(state.facing);
   } catch (err) {

@@ -1,34 +1,45 @@
-# Bone artwork
+# Artwork and 3D assets
 
-`source-skeleton.png` is an anterior view of the human skeleton, supplied by the
-project owner. It appears to be the labelled anatomical diagram distributed via
-Wikimedia Commons, which is published there as public domain. **Confirm that
-licensing before relying on it** — this repository is public, and the file is
-redistributed with it.
+## skeleton.glb — the posable 3D skeleton
 
-`bones/` holds the individual bone sprites cut from that plate by
-`scripts/slice-bones.mjs`, plus a `manifest.json` describing each one. They are
-generated, not hand-edited: change the slice table in that script and re-run it
-rather than editing the PNGs.
+Cut from the **[Z-Anatomy](https://github.com/LluisV/Z-Anatomy)** skeletal
+atlas by `scripts/extract-skeleton.mjs`.
 
-**These are not currently drawn.** The skeleton is real 3D geometry now
-(`js/mirror/skeleton3d.js`), not flat artwork posed on the picture. The sprites
-are kept because the next step for realism is to use them as textures on those
-meshes, which needs the same slices.
+> Models from the Z-Anatomy project, by Lluís Vinent Juanico and contributors.
+> Licensed **[CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)**.
+
+**Share-alike applies.** `skeleton.glb` is a derivative of a CC BY-SA 4.0 work,
+so it carries the same licence and the attribution above has to travel with it.
+That covers this asset, not the rest of the source in this repository.
+
+### Regenerating it
+
+The source FBX is ~41 MB and is not committed. Fetch it and re-run the
+extractor with the dev server running:
 
 ```sh
-node scripts/slice-bones.mjs
+GIT_LFS_SKIP_SMUDGE=1 git clone --depth 1 https://github.com/LluisV/Z-Anatomy /tmp/z-anatomy
+mkdir -p vendor/fbx
+cp "/tmp/z-anatomy/Z-Anatomy PC/Assets/Models/1.0 Models/SkeletalSystem100.fbx" vendor/fbx/skeleton.fbx
+npm start &
+node scripts/extract-skeleton.mjs
 ```
 
-Each sprite is extracted already rotated, so its bone runs along the sprite's
-+x axis starting `pad` pixels in and centred vertically. That matches the local
-frame the drawn bones use, so posing one onto tracked landmarks is a translate,
-a rotate and a uniform scale — and the same sprite can be handed straight to the
-physics engine when the skeleton collapses.
+The atlas holds 1,952 separately named structures — bones and soft tissue
+together, ~4.9M vertices, in a standing rest pose at life size. The extractor
+drops the soft tissue, merges what remains into the twenty-odd pieces the rig
+actually moves, welds duplicate vertices (which alone takes ~1.97M vertices
+down to ~315K), and records where each piece's two joints sit in the rest pose.
+Those joint pairs are what let `js/mirror/skeleton3d.js` pose a bone: map the
+rest pair onto the live landmark pair with a rotation, a uniform scale and a
+translation.
 
-The slicer also cleans the plate on the way out: the white background is keyed
-to transparent, the blue and red leader lines are inpainted from neighbouring
-bone pixels rather than left as holes, the label text is removed (except on the
-skull and neck, where the nasal aperture and eye sockets are genuinely black),
-and the crop border is feathered so neighbouring anatomy caught inside a crop
-fades out instead of ending in a hard rectangular edge.
+## source-skeleton.png — the 2D anatomical plate
+
+An anterior view supplied by the project owner, believed to be the labelled
+diagram distributed via Wikimedia Commons as public domain. **Confirm that
+before relying on it** — this repository is public.
+
+`bones/` holds sprites cut from it by `scripts/slice-bones.mjs`. **These are
+not currently drawn**: the skeleton is real 3D geometry now, not flat artwork.
+They are kept only as a possible source of surface texture for the 3D meshes.

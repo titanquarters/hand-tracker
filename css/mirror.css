@@ -134,3 +134,6 @@ body.no-video #video { opacity: 0; }
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+
+.credit { opacity: .45; }
+.credit a { color: inherit; }
