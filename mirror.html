@@ -13,7 +13,10 @@
 
 <div id="frame">
   <video id="video" playsinline autoplay muted></video>
+  <!-- 2D layer: paints the tracked bodies out of the picture -->
   <canvas id="stage"></canvas>
+  <!-- 3D layer: the skeletons themselves, lit and depth-sorted -->
+  <canvas id="gl"></canvas>
 </div>
 
 <!-- Offscreen scratch buffer for the body-erase mask -->
@@ -34,7 +37,6 @@
   </div>
 </div>
 
-<script src="lib/matter.min.js"></script>
 <script type="module" src="js/mirror/app.js"></script>
 </body>
 </html>

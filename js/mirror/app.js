@@ -1,7 +1,7 @@
 import { HandSmoother } from '../smoothing.js';
 import { FloorEstimator } from './floor.js';
-import { layout, drawSkeleton, L } from './bones.js';
-import { Collapse, StillnessWatch, REFORMING } from './collapse.js';
+import { Skeleton3D, P } from './skeleton3d.js';
+import { StillnessWatch } from './stillness.js';
 
 /* ------------------------------------------------------------------ config */
 
@@ -26,6 +26,7 @@ const MAX_DPR = 2;
 const el = {
   video: document.getElementById('video'),
   canvas: document.getElementById('stage'),
+  gl: document.getElementById('gl'),
   mask: document.getElementById('maskbuf'),
   splash: document.getElementById('splash'),
   splashMsg: document.getElementById('splashMsg'),
@@ -39,6 +40,8 @@ const ctx = el.canvas.getContext('2d');
 const maskCtx = el.mask.getContext('2d', { willReadFrequently: true });
 
 const smoother = new HandSmoother(0.6);
+const worldSmoother = new HandSmoother(0.6);
+const skeleton = new Skeleton3D(el.gl, { maxPeople: MAX_PEOPLE });
 const floor = new FloorEstimator();
 const stillness = new StillnessWatch();
 
@@ -50,9 +53,7 @@ const state = {
   lastVideoTime: -1,
   lastTimestamp: -1,
   lastFrame: 0,
-  people: [],            // [{ key, pts, span, floorY }]
-  collapses: new Map(),  // key -> Collapse
-  prevPlaced: new Map(), // key -> last frame's bones, for velocity at handover
+  people: [],            // [{ key, pts, world, span, floorY }]
   eraseBody: true,
   maskReady: false,
   showVideo: true,
@@ -73,6 +74,7 @@ function resize() {
     el.canvas.height = bh;
   }
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  skeleton.resize(w, h, dpr);
 }
 
 const isMirrored = () => state.facing === 'user';
@@ -222,22 +224,6 @@ function eraseBodies(viewW, viewH) {
 
 /* -------------------------------------------------------------- main loop */
 
-/** Per-bone velocity in px/s, so a collapse inherits the motion it had. */
-function velocities(key, placed, dt) {
-  const prev = state.prevPlaced.get(key);
-  const out = {};
-  if (prev && dt > 0) {
-    for (const bone of placed) {
-      const was = prev.get(bone.id);
-      if (was) out[bone.id] = { x: (bone.x - was.x) / dt, y: (bone.y - was.y) / dt };
-    }
-  }
-  const now = new Map();
-  for (const bone of placed) now.set(bone.id, { x: bone.x, y: bone.y });
-  state.prevPlaced.set(key, now);
-  return out;
-}
-
 function loop() {
   requestAnimationFrame(loop);
   if (!state.running) return;
@@ -264,21 +250,28 @@ function loop() {
       bakeMask(result.segmentationMasks);
 
       const raw = result.landmarks || [];
+      const rawWorld = result.worldLandmarks || [];
       // Pose results have no identity, so index is the only stable key we get.
       const keys = raw.map((_, i) => `p${i}`);
       const smoothed = smoother.apply(raw, [], keys, now);
+      // The metric landmarks drive the 3D rig and need the same steadying, but
+      // they live in a different space, so they get their own filter bank.
+      const smoothedWorld = worldSmoother.apply(rawWorld, [], keys, now);
 
       const mapper = makeMapper(vw, vh, viewW, viewH);
       state.people = smoothed.hands.map((landmarks, i) => {
         const pts = landmarks.map(mapper);
         // Torso span in screen pixels: the scale everything else is measured in.
         const spanPx = Math.hypot(
-          (pts[L.shoulderL].x + pts[L.shoulderR].x) / 2 - (pts[L.hipL].x + pts[L.hipR].x) / 2,
-          (pts[L.shoulderL].y + pts[L.shoulderR].y) / 2 - (pts[L.hipL].y + pts[L.hipR].y) / 2,
+          (pts[P.shoulderL].x + pts[P.shoulderR].x) / 2 - (pts[P.hipL].x + pts[P.hipR].x) / 2,
+          (pts[P.shoulderL].y + pts[P.shoulderR].y) / 2 - (pts[P.hipL].y + pts[P.hipR].y) / 2,
         ) || 1;
         const f = floor.update(keys[i], landmarks, now);
         const floorPx = f ? mapper({ x: 0.5, y: f.y }).y : viewH;
-        return { key: keys[i], landmarks, pts, span: spanPx, floorY: floorPx, floorSource: f?.source };
+        return {
+          key: keys[i], landmarks, pts, world: smoothedWorld.hands[i],
+          span: spanPx, floorY: floorPx, floorSource: f?.source,
+        };
       });
       floor.prune(now);
     } catch (err) {
@@ -290,33 +283,37 @@ function loop() {
   ctx.clearRect(0, 0, viewW, viewH);
   if (state.eraseBody) eraseBodies(viewW, viewH);
 
-  const live = new Set();
-
+  let posed = 0;
   for (const person of state.people) {
-    live.add(person.key);
-    const placed = layout(person.pts, person.span);
-    const collapse = state.collapses.get(person.key);
+    const world = person.world;
+    if (!world || world.length < 33) continue;
 
-    if (collapse) {
-      collapse.step(dtMs, now);
-      const { placed: bones, done } = collapse.render(
-        collapse.state === REFORMING ? placed : null, now,
-      );
-      drawSkeleton(ctx, bones, true);
-      if (done) {
-        collapse.destroy();
-        state.collapses.delete(person.key);
-        stillness.rearm(person.key);
-      }
-      continue;
-    }
+    /* Fit the 3D rig onto the person in the picture.
+     *
+     * The world landmarks describe the body's shape in metres but say nothing
+     * about where it sits on screen. So the torso gives the conversion: however
+     * many pixels the shoulder-to-hip span covers in the video is how many
+     * pixels a metre is worth, and the rig is then pushed to whatever distance
+     * makes that true and slid so the hips line up. */
+    const torsoMetres = Math.hypot(
+      (world[P.shoulderL].x + world[P.shoulderR].x) / 2 - (world[P.hipL].x + world[P.hipR].x) / 2,
+      (world[P.shoulderL].y + world[P.shoulderR].y) / 2 - (world[P.hipL].y + world[P.hipR].y) / 2,
+      (world[P.shoulderL].z + world[P.shoulderR].z) / 2 - (world[P.hipL].z + world[P.hipR].z) / 2,
+    );
+    if (!(torsoMetres > 0.05)) continue;
 
-    drawSkeleton(ctx, placed, true);
+    const hipX = (person.pts[P.hipL].x + person.pts[P.hipR].x) / 2;
+    const hipY = (person.pts[P.hipL].y + person.pts[P.hipR].y) / 2;
 
-    const motion = velocities(person.key, placed, dtMs / 1000);
-    if (stillness.update(person.key, person.pts, person.span, now)) {
-      state.collapses.set(person.key, new Collapse(placed, person.floorY, person.span, motion));
-    }
+    skeleton.pose(posed, world, {
+      pixelsPerMetre: person.span / torsoMetres,
+      screenX: hipX,
+      screenY: hipY,
+      viewW,
+      viewH,
+      mirrored: isMirrored(),
+    });
+    posed++;
 
     if (state.debugFloor) {
       ctx.save();
@@ -334,11 +331,8 @@ function loop() {
     }
   }
 
-  // Drop state for people who have left.
-  for (const key of [...state.collapses.keys()]) {
-    if (!live.has(key)) { state.collapses.get(key).destroy(); state.collapses.delete(key); }
-  }
-  for (const key of [...state.prevPlaced.keys()]) if (!live.has(key)) state.prevPlaced.delete(key);
+  skeleton.hideFrom(posed);
+  skeleton.render();
 
   el.idle.classList.toggle('hidden', state.people.length > 0);
   if (el.hud && !el.hud.classList.contains('hidden')) {
@@ -392,13 +386,7 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'v') { state.showVideo = !state.showVideo; document.body.classList.toggle('no-video', !state.showVideo); }
   if (e.key === 'b') state.eraseBody = !state.eraseBody;
   if (e.key === 'f') state.debugFloor = !state.debugFloor;
-  if (e.key === 'c') {
-    for (const person of state.people) {
-      if (state.collapses.has(person.key)) continue;
-      const placed = layout(person.pts, person.span);
-      state.collapses.set(person.key, new Collapse(placed, person.floorY, person.span, {}));
-    }
-  }
+  // 'c' will force a collapse once the 3D version of it lands.
 });
 
-window.__mirror = { state, floor, smoother, stillness, layout, makeMapper, el };
+window.__mirror = { state, floor, smoother, worldSmoother, stillness, skeleton, makeMapper, el };

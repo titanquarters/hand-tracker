@@ -11,6 +11,11 @@ redistributed with it.
 generated, not hand-edited: change the slice table in that script and re-run it
 rather than editing the PNGs.
 
+**These are not currently drawn.** The skeleton is real 3D geometry now
+(`js/mirror/skeleton3d.js`), not flat artwork posed on the picture. The sprites
+are kept because the next step for realism is to use them as textures on those
+meshes, which needs the same slices.
+
 ```sh
 node scripts/slice-bones.mjs
 ```
