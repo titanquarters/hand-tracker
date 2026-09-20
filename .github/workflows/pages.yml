@@ -4,7 +4,11 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [main]
+    # This repo's default branch is the feature branch below; `main` is listed
+    # too so the workflow keeps working once the work lands there.
+    branches:
+      - main
+      - claude/iphone-hand-skeleton-detection-wv8l1n
   workflow_dispatch:
 
 permissions:
@@ -24,9 +28,16 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+
+      # enablement: true turns Pages on via the API and points it at Actions,
+      # so the site does not need to be switched on by hand first.
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .
+
       - id: deployment
         uses: actions/deploy-pages@v4
